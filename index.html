@@ -4,7 +4,110 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sticker Stock Management</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    // 1. Initialize Supabase
+    const supabaseUrl = 'YOUR_SUPABASE_URL';
+    const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+    const supabase = lib.createClient(supabaseUrl, supabaseKey);
+
+    let transactions = [];
+
+    // 2. Load data from Supabase on start
+    window.onload = async () => {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('r-date').value = today;
+        document.getElementById('c-date').value = today;
+        await fetchTransactions();
+    };
+
+    async function fetchTransactions() {
+        const { data, error } = await supabase
+            .from('sticker_stock')
+            .select('*')
+            .order('date', { ascending: false });
+        
+        if (error) console.error('Error:', error);
+        else {
+            transactions = data;
+            render();
+        }
+    }
+
+    // 3. Updated Form Submissions
+    document.getElementById('receive-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const entry = {
+            date: document.getElementById('r-date').value,
+            type: 'Receive',
+            ir_number: document.getElementById('r-ir').value,
+            quantity: parseInt(document.getElementById('r-qty').value)
+        };
+        const { error } = await supabase.from('sticker_stock').insert([entry]);
+        if (!error) {
+            e.target.reset();
+            fetchTransactions();
+        }
+    });
+
+    document.getElementById('consume-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const entry = {
+            date: document.getElementById('c-date').value,
+            type: 'Consume',
+            ir_number: '-',
+            quantity: parseInt(document.getElementById('c-qty').value)
+        };
+        const { error } = await supabase.from('sticker_stock').insert([entry]);
+        if (!error) {
+            e.target.reset();
+            fetchTransactions();
+        }
+    });
+
+    // 4. Updated Delete Function
+    async function deleteTransaction(id) {
+        if (confirm('Are you sure?')) {
+            const { error } = await supabase.from('sticker_stock').delete().eq('id', id);
+            if (!error) fetchTransactions();
+        }
+    }
+
+    // 5. Render Function (Modified for Supabase ID)
+    function render() {
+        const tbody = document.getElementById('transaction-body');
+        tbody.innerHTML = '';
+        let totalR = 0, totalC = 0;
+
+        transactions.forEach(t => {
+            if (t.type === 'Receive') totalR += t.quantity;
+            else totalC += t.quantity;
+
+            tbody.innerHTML += `<tr>
+                <td>${t.date}</td>
+                <td><span class="badge ${t.type === 'Receive' ? 'badge-receive' : 'badge-consume'}">${t.type}</span></td>
+                <td>${t.ir_number}</td>
+                <td>${t.quantity}</td>
+                <td><button class="btn-delete" onclick="deleteTransaction(${t.id})">Delete</button></td>
+            </tr>`;
+        });
+
+        document.getElementById('total-received').innerText = totalR;
+        document.getElementById('total-consumed').innerText = totalC;
+        document.getElementById('current-stock').innerText = totalR - totalC;
+    }
+
+    function exportToExcel() {
+        const data = transactions.map(t => ({
+            Date: t.date, Type: t.type, "IR Number": t.ir_number, Quantity: t.quantity
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Stock Data");
+        XLSX.writeFile(wb, "Sticker_Stock_Report.xlsx");
+    }
+</script>
     <style>
         :root {
             --primary: #2563eb;
