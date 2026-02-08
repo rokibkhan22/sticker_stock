@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sticker Stock Management</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --danger: #dc2626;
+            --success: #16a34a;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h2 { text-align: center; color: #334155; }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .card h3 { margin: 0; font-size: 0.9rem; text-transform: uppercase; opacity: 0.8; }
+        .card .value { font-size: 2rem; font-weight: bold; margin-top: 10px; }
+
+        .received { border-top: 5px solid var(--primary); color: var(--primary); }
+        .consumed { border-top: 5px solid var(--danger); color: var(--danger); }
+        .stock { border-top: 5px solid var(--success); color: var(--success); }
+
+        .forms-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        form {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        form h4 { margin-top: 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-size: 0.9rem; font-weight: 600; }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            outline: none;
+        }
+        input:focus { border-color: var(--primary); }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.8; }
+
+        .btn-receive { background: var(--primary); color: white; }
+        .btn-consume { background: var(--danger); color: white; }
+        .btn-export { background: #64748b; color: white; margin-bottom: 20px; width: auto; }
+
+        .table-container {
+            background: var(--card);
+            border-radius: 12px;
+            overflow-x: auto;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f1f5f9; font-weight: 600; }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .badge-receive { background: #dbeafe; color: var(--primary); }
+        .badge-consume { background: #fee2e2; color: var(--danger); }
+
+        .btn-delete {
+            background: #fee2e2;
+            color: var(--danger);
+            padding: 6px 12px;
+            width: auto;
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Sticker Stock Management</h2>
+
+    <div class="summary-grid">
+        <div class="card received">
+            <h3>Total Received</h3>
+            <div id="total-received" class="value">0</div>
+        </div>
+        <div class="card consumed">
+            <h3>Total Consumed</h3>
+            <div id="total-consumed" class="value">0</div>
+        </div>
+        <div class="card stock">
+            <h3>Current Stock</h3>
+            <div id="current-stock" class="value">0</div>
+        </div>
+    </div>
+
+    <div class="forms-container">
+        <form id="receive-form">
+            <h4>Receive Stickers</h4>
+            <div class="input-group">
+                <label>Date</label>
+                <input type="date" id="r-date" required>
+            </div>
+            <div class="input-group">
+                <label>IR Number</label>
+                <input type="text" id="r-ir" placeholder="Enter IR No." required>
+            </div>
+            <div class="input-group">
+                <label>Quantity</label>
+                <input type="number" id="r-qty" min="1" required>
+            </div>
+            <button type="submit" class="btn-receive">Add Stock</button>
+        </form>
+
+        <form id="consume-form">
+            <h4>Consume Stickers</h4>
+            <div class="input-group">
+                <label>Date</label>
+                <input type="date" id="c-date" required>
+            </div>
+            <div class="input-group">
+                <label>Quantity</label>
+                <input type="number" id="c-qty" min="1" required>
+            </div>
+            <button type="submit" class="btn-consume">Record Consumption</button>
+        </form>
+    </div>
+
+    <button onclick="exportToExcel()" class="btn-export">Export to Excel (.xlsx)</button>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>IR Number</th>
+                    <th>Quantity</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="transaction-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let transactions = [];
+
+    window.onload = () => {
+        localStorage.removeItem('sticker_data');
+        render();
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('r-date').value = today;
+        document.getElementById('c-date').value = today;
+    };
+
+    document.getElementById('receive-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        addTransaction({
+            id: Date.now(),
+            date: document.getElementById('r-date').value,
+            type: 'Receive',
+            ir: document.getElementById('r-ir').value,
+            qty: parseInt(document.getElementById('r-qty').value)
+        });
+        e.target.reset();
+        document.getElementById('r-date').value = new Date().toISOString().split('T')[0];
+    });
+
+    document.getElementById('consume-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        addTransaction({
+            id: Date.now(),
+            date: document.getElementById('c-date').value,
+            type: 'Consume',
+            ir: '-',
+            qty: parseInt(document.getElementById('c-qty').value)
+        });
+        e.target.reset();
+        document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
+    });
+
+    function addTransaction(t) {
+        transactions.push(t);
+        saveAndRender();
+    }
+
+    function deleteTransaction(id) {
+        if (confirm('Are you sure you want to delete this record?')) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveAndRender();
+        }
+    }
+
+    function saveAndRender() {
+        localStorage.setItem('sticker_data', JSON.stringify(transactions));
+        render();
+    }
+
+    function render() {
+        const tbody = document.getElementById('transaction-body');
+        tbody.innerHTML = '';
+        
+        let totalR = 0;
+        let totalC = 0;
+
+        transactions.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(t => {
+            if (t.type === 'Receive') totalR += t.qty;
+            else totalC += t.qty;
+
+            const row = `<tr>
+                <td>${t.date}</td>
+                <td><span class="badge ${t.type === 'Receive' ? 'badge-receive' : 'badge-consume'}">${t.type}</span></td>
+                <td>${t.ir}</td>
+                <td>${t.qty}</td>
+                <td><button class="btn-delete" onclick="deleteTransaction(${t.id})">Delete</button></td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+
+        document.getElementById('total-received').innerText = totalR;
+        document.getElementById('total-consumed').innerText = totalC;
+        document.getElementById('current-stock').innerText = totalR - totalC;
+    }
+
+    function exportToExcel() {
+        const data = transactions.map(t => ({
+            Date: t.date,
+            Type: t.type,
+            "IR Number": t.ir,
+            Quantity: t.qty
+        }));
+        
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Stock Data");
+        XLSX.writeFile(wb, "Sticker_Stock_Report.xlsx");
+    }
+</script>
+
+</body>
+</html>
