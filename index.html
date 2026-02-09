@@ -4,75 +4,111 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sticker Stock Management</title>
+
+    <!-- Excel Export Library -->
    <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbzvq5i0EQG65DgBtgUiLUiYS0khcNPLiuFBhoFFi3RbOvrrLn85iRMQPzCAaAu0gh94FA/exec";
 let transactions = [];
 
-window.onload = async () => {
-  await loadData();
-  render();
-  const t = new Date().toISOString().split('T')[0];
-  r-date.value = c-date.value = t;
-};
-
-async function loadData() {
-  const r = await fetch(API_URL);
-  transactions = await r.json();
+// Load data from Google Sheet
+async function loadTransactions() {
+    const res = await fetch(API_URL);
+    transactions = await res.json();
 }
 
+// Save transaction to Google Sheet
 async function addTransaction(t) {
-  await fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify(t)
-  });
-  await loadData();
-  render();
+    await fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(t)
+    });
+    await loadTransactions();
+    render();
 }
 
-receive-form.onsubmit = async e => {
-  e.preventDefault();
-  await addTransaction({
-    id: Date.now(),
-    date: r-date.value,
-    type: "Receive",
-    ir: r-ir.value,
-    qty: +r-qty.value
-  });
-  e.target.reset();
+// On page load
+window.onload = async () => {
+    await loadTransactions();
+    render();
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("r-date").value = today;
+    document.getElementById("c-date").value = today;
 };
 
-consume-form.onsubmit = async e => {
-  e.preventDefault();
-  await addTransaction({
-    id: Date.now(),
-    date: c-date.value,
-    type: "Consume",
-    ir: "-",
-    qty: +c-qty.value
-  });
-  e.target.reset();
-};
+// Receive form
+document.getElementById("receive-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
 
+    await addTransaction({
+        id: Date.now(),
+        date: document.getElementById("r-date").value,
+        type: "Receive",
+        ir: document.getElementById("r-ir").value,
+        qty: Number(document.getElementById("r-qty").value)
+    });
+
+    e.target.reset();
+});
+
+// Consume form
+document.getElementById("consume-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    await addTransaction({
+        id: Date.now(),
+        date: document.getElementById("c-date").value,
+        type: "Consume",
+        ir: "-",
+        qty: Number(document.getElementById("c-qty").value)
+    });
+
+    e.target.reset();
+});
+
+// Render table & summary
 function render() {
-  transaction-body.innerHTML = "";
-  let r = 0, c = 0;
-  transactions.forEach(t => {
-    t.type === "Receive" ? r += t.qty : c += t.qty;
-    transaction-body.innerHTML += `
-      <tr>
-        <td>${t.date}</td>
-        <td>${t.type}</td>
-        <td>${t.ir}</td>
-        <td>${t.qty}</td>
-        <td>-</td>
-      </tr>`;
-  });
-  total-received.innerText = r;
-  total-consumed.innerText = c;
-  current-stock.innerText = r - c;
+    const tbody = document.getElementById("transaction-body");
+    tbody.innerHTML = "";
+
+    let totalR = 0;
+    let totalC = 0;
+
+    transactions.forEach(t => {
+        if (t.type === "Receive") totalR += t.qty;
+        else totalC += t.qty;
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${t.date}</td>
+                <td>${t.type}</td>
+                <td>${t.ir}</td>
+                <td>${t.qty}</td>
+                <td>-</td>
+            </tr>
+        `;
+    });
+
+    document.getElementById("total-received").innerText = totalR;
+    document.getElementById("total-consumed").innerText = totalC;
+    document.getElementById("current-stock").innerText = totalR - totalC;
+}
+
+// Excel export
+function exportToExcel() {
+    const data = transactions.map(t => ({
+        Date: t.date,
+        Type: t.type,
+        "IR Number": t.ir,
+        Quantity: t.qty
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Stock Data");
+    XLSX.writeFile(wb, "Sticker_Stock_Report.xlsx");
 }
 </script>
-
 
 
     <style>
@@ -126,17 +162,15 @@ function render() {
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
-        form h4 { margin-top: 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
         .input-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-size: 0.9rem; font-weight: 600; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; }
+
         input {
             width: 100%;
             padding: 10px;
             border: 1px solid #cbd5e1;
             border-radius: 6px;
-            outline: none;
         }
-        input:focus { border-color: var(--primary); }
 
         button {
             width: 100%;
@@ -145,49 +179,18 @@ function render() {
             border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
-            transition: opacity 0.2s;
         }
-        button:active { opacity: 0.8; }
 
         .btn-receive { background: var(--primary); color: white; }
         .btn-consume { background: var(--danger); color: white; }
-        .btn-export { background: #64748b; color: white; margin-bottom: 20px; width: auto; }
+        .btn-export { background: #64748b; color: white; margin-bottom: 20px; }
 
-        .table-container {
-            background: var(--card);
-            border-radius: 12px;
-            overflow-x: auto;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-        }
-
-        table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        th { background: #f1f5f9; font-weight: 600; }
-
-        .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .badge-receive { background: #dbeafe; color: var(--primary); }
-        .badge-consume { background: #fee2e2; color: var(--danger); }
-
-        .btn-delete {
-            background: #fee2e2;
-            color: var(--danger);
-            padding: 6px 12px;
-            width: auto;
-            font-size: 0.8rem;
-        }
-
-        @media (max-width: 600px) {
-            body { padding: 10px; }
-            .summary-grid { grid-template-columns: 1fr; }
-        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f1f5f9; }
     </style>
 </head>
+
 <body>
 
 <div class="container">
@@ -217,13 +220,13 @@ function render() {
             </div>
             <div class="input-group">
                 <label>IR Number</label>
-                <input type="text" id="r-ir" placeholder="Enter IR No." required>
+                <input type="text" id="r-ir" required>
             </div>
             <div class="input-group">
                 <label>Quantity</label>
                 <input type="number" id="r-qty" min="1" required>
             </div>
-            <button type="submit" class="btn-receive">Add Stock</button>
+            <button class="btn-receive">Add Stock</button>
         </form>
 
         <form id="consume-form">
@@ -236,123 +239,104 @@ function render() {
                 <label>Quantity</label>
                 <input type="number" id="c-qty" min="1" required>
             </div>
-            <button type="submit" class="btn-consume">Record Consumption</button>
+            <button class="btn-consume">Record Consumption</button>
         </form>
     </div>
 
-    <button onclick="exportToExcel()" class="btn-export">Export to Excel (.xlsx)</button>
+    <button class="btn-export" onclick="exportToExcel()">Export to Excel</button>
 
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>IR Number</th>
-                    <th>Quantity</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="transaction-body"></tbody>
-        </table>
-    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>IR Number</th>
+                <th>Quantity</th>
+            </tr>
+        </thead>
+        <tbody id="transaction-body"></tbody>
+    </table>
 </div>
 
 <script>
-    let transactions = [];
+const API_URL = "https://script.google.com/macros/s/AKfycbzvq5i0EQG65DgBtgUiLUiYS0khcNPLiuFBhoFFi3RbOvrrLn85iRMQPzCAaAu0gh94FA/exec";
+let transactions = [];
 
-    window.onload = () => {
-        localStorage.removeItem('sticker_data');
-        render();
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('r-date').value = today;
-        document.getElementById('c-date').value = today;
-    };
+async function loadTransactions() {
+    const res = await fetch(API_URL);
+    transactions = await res.json();
+}
 
-    document.getElementById('receive-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        addTransaction({
-            id: Date.now(),
-            date: document.getElementById('r-date').value,
-            type: 'Receive',
-            ir: document.getElementById('r-ir').value,
-            qty: parseInt(document.getElementById('r-qty').value)
-        });
-        e.target.reset();
-        document.getElementById('r-date').value = new Date().toISOString().split('T')[0];
+async function addTransaction(t) {
+    await fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify(t)
     });
+    await loadTransactions();
+    render();
+}
 
-    document.getElementById('consume-form').addEventListener('submit', (e) => {
-        e.preventDefault();
-        addTransaction({
-            id: Date.now(),
-            date: document.getElementById('c-date').value,
-            type: 'Consume',
-            ir: '-',
-            qty: parseInt(document.getElementById('c-qty').value)
-        });
-        e.target.reset();
-        document.getElementById('c-date').value = new Date().toISOString().split('T')[0];
+window.onload = async () => {
+    await loadTransactions();
+    render();
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById("r-date").value = today;
+    document.getElementById("c-date").value = today;
+};
+
+document.getElementById("receive-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    await addTransaction({
+        id: Date.now(),
+        date: r-date.value,
+        type: "Receive",
+        ir: r-ir.value,
+        qty: Number(r-qty.value)
     });
+    e.target.reset();
+});
 
-    function addTransaction(t) {
-        transactions.push(t);
-        saveAndRender();
-    }
+document.getElementById("consume-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    await addTransaction({
+        id: Date.now(),
+        date: c-date.value,
+        type: "Consume",
+        ir: "-",
+        qty: Number(c-qty.value)
+    });
+    e.target.reset();
+});
 
-    function deleteTransaction(id) {
-        if (confirm('Are you sure you want to delete this record?')) {
-            transactions = transactions.filter(t => t.id !== id);
-            saveAndRender();
-        }
-    }
+function render() {
+    const body = document.getElementById("transaction-body");
+    body.innerHTML = "";
+    let r = 0, c = 0;
 
-    function saveAndRender() {
-        localStorage.setItem('sticker_data', JSON.stringify(transactions));
-        render();
-    }
-
-    function render() {
-        const tbody = document.getElementById('transaction-body');
-        tbody.innerHTML = '';
-        
-        let totalR = 0;
-        let totalC = 0;
-
-        transactions.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(t => {
-            if (t.type === 'Receive') totalR += t.qty;
-            else totalC += t.qty;
-
-            const row = `<tr>
+    transactions.forEach(t => {
+        t.type === "Receive" ? r += t.qty : c += t.qty;
+        body.innerHTML += `
+            <tr>
                 <td>${t.date}</td>
-                <td><span class="badge ${t.type === 'Receive' ? 'badge-receive' : 'badge-consume'}">${t.type}</span></td>
+                <td>${t.type}</td>
                 <td>${t.ir}</td>
                 <td>${t.qty}</td>
-                <td><button class="btn-delete" onclick="deleteTransaction(${t.id})">Delete</button></td>
             </tr>`;
-            tbody.innerHTML += row;
-        });
+    });
 
-        document.getElementById('total-received').innerText = totalR;
-        document.getElementById('total-consumed').innerText = totalC;
-        document.getElementById('current-stock').innerText = totalR - totalC;
-    }
+    total-received.innerText = r;
+    total-consumed.innerText = c;
+    current-stock.innerText = r - c;
+}
 
-    function exportToExcel() {
-        const data = transactions.map(t => ({
-            Date: t.date,
-            Type: t.type,
-            "IR Number": t.ir,
-            Quantity: t.qty
-        }));
-        
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Stock Data");
-        XLSX.writeFile(wb, "Sticker_Stock_Report.xlsx");
-    }
+function exportToExcel() {
+    const ws = XLSX.utils.json_to_sheet(transactions);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Stock");
+    XLSX.writeFile(wb, "Sticker_Stock.xlsx");
+}
 </script>
 
 </body>
 </html>
-
+ 
