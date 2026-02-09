@@ -4,110 +4,77 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sticker Stock Management</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+   <script>
+const API_URL = "https://script.google.com/macros/s/AKfycbzvq5i0EQG65DgBtgUiLUiYS0khcNPLiuFBhoFFi3RbOvrrLn85iRMQPzCAaAu0gh94FA/exec";
+let transactions = [];
 
-<script>
-    // 1. Initialize Supabase
-    const supabaseUrl = 'YOUR_SUPABASE_URL';
-    const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
-    const supabase = lib.createClient(supabaseUrl, supabaseKey);
+window.onload = async () => {
+  await loadData();
+  render();
+  const t = new Date().toISOString().split('T')[0];
+  r-date.value = c-date.value = t;
+};
 
-    let transactions = [];
+async function loadData() {
+  const r = await fetch(API_URL);
+  transactions = await r.json();
+}
 
-    // 2. Load data from Supabase on start
-    window.onload = async () => {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('r-date').value = today;
-        document.getElementById('c-date').value = today;
-        await fetchTransactions();
-    };
+async function addTransaction(t) {
+  await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify(t)
+  });
+  await loadData();
+  render();
+}
 
-    async function fetchTransactions() {
-        const { data, error } = await supabase
-            .from('sticker_stock')
-            .select('*')
-            .order('date', { ascending: false });
-        
-        if (error) console.error('Error:', error);
-        else {
-            transactions = data;
-            render();
-        }
-    }
+receive-form.onsubmit = async e => {
+  e.preventDefault();
+  await addTransaction({
+    id: Date.now(),
+    date: r-date.value,
+    type: "Receive",
+    ir: r-ir.value,
+    qty: +r-qty.value
+  });
+  e.target.reset();
+};
 
-    // 3. Updated Form Submissions
-    document.getElementById('receive-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const entry = {
-            date: document.getElementById('r-date').value,
-            type: 'Receive',
-            ir_number: document.getElementById('r-ir').value,
-            quantity: parseInt(document.getElementById('r-qty').value)
-        };
-        const { error } = await supabase.from('sticker_stock').insert([entry]);
-        if (!error) {
-            e.target.reset();
-            fetchTransactions();
-        }
-    });
+consume-form.onsubmit = async e => {
+  e.preventDefault();
+  await addTransaction({
+    id: Date.now(),
+    date: c-date.value,
+    type: "Consume",
+    ir: "-",
+    qty: +c-qty.value
+  });
+  e.target.reset();
+};
 
-    document.getElementById('consume-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const entry = {
-            date: document.getElementById('c-date').value,
-            type: 'Consume',
-            ir_number: '-',
-            quantity: parseInt(document.getElementById('c-qty').value)
-        };
-        const { error } = await supabase.from('sticker_stock').insert([entry]);
-        if (!error) {
-            e.target.reset();
-            fetchTransactions();
-        }
-    });
-
-    // 4. Updated Delete Function
-    async function deleteTransaction(id) {
-        if (confirm('Are you sure?')) {
-            const { error } = await supabase.from('sticker_stock').delete().eq('id', id);
-            if (!error) fetchTransactions();
-        }
-    }
-
-    // 5. Render Function (Modified for Supabase ID)
-    function render() {
-        const tbody = document.getElementById('transaction-body');
-        tbody.innerHTML = '';
-        let totalR = 0, totalC = 0;
-
-        transactions.forEach(t => {
-            if (t.type === 'Receive') totalR += t.quantity;
-            else totalC += t.quantity;
-
-            tbody.innerHTML += `<tr>
-                <td>${t.date}</td>
-                <td><span class="badge ${t.type === 'Receive' ? 'badge-receive' : 'badge-consume'}">${t.type}</span></td>
-                <td>${t.ir_number}</td>
-                <td>${t.quantity}</td>
-                <td><button class="btn-delete" onclick="deleteTransaction(${t.id})">Delete</button></td>
-            </tr>`;
-        });
-
-        document.getElementById('total-received').innerText = totalR;
-        document.getElementById('total-consumed').innerText = totalC;
-        document.getElementById('current-stock').innerText = totalR - totalC;
-    }
-
-    function exportToExcel() {
-        const data = transactions.map(t => ({
-            Date: t.date, Type: t.type, "IR Number": t.ir_number, Quantity: t.quantity
-        }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Stock Data");
-        XLSX.writeFile(wb, "Sticker_Stock_Report.xlsx");
-    }
+function render() {
+  transaction-body.innerHTML = "";
+  let r = 0, c = 0;
+  transactions.forEach(t => {
+    t.type === "Receive" ? r += t.qty : c += t.qty;
+    transaction-body.innerHTML += `
+      <tr>
+        <td>${t.date}</td>
+        <td>${t.type}</td>
+        <td>${t.ir}</td>
+        <td>${t.qty}</td>
+        <td>-</td>
+      </tr>`;
+  });
+  total-received.innerText = r;
+  total-consumed.innerText = c;
+  current-stock.innerText = r - c;
+}
 </script>
+
+
+
     <style>
         :root {
             --primary: #2563eb;
@@ -388,3 +355,4 @@
 
 </body>
 </html>
+
